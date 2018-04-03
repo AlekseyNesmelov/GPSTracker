@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+	<item>
+		<shape android:shape="rectangle">
+			<solid android:color="@color/colorAccent"/>
+			<corners android:radius="30dp"/>
+			<padding android:bottom="5dp" android:left="5dp" android:right="5dp" android:top="5dp" />
+		</shape>
+	</item>
+	<item>
+		<bitmap android:src="@drawable/ic_my_location_black_48dp"/>
+	</item>
+</layer-list>

@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">GPSTracker</string>
+    <string name="map">Map</string>
+    <string name="alarms">Alarms</string>
+    <string name="my_tracks">My tracks</string>
+    <string name="settings">Settings</string>
+    <string name="location_not_granted">Location permission must be granted</string>
+    <string name="search">Search</string>
+    <string name="search_address">Search address</string>
+    <string name="recent">Recent</string>
+    <string name="favourite">Favourite</string>
+    <string name="removed_favourite">The address was removed from favourites</string>
+    <string name="cancel">Cancel</string>
+</resources>

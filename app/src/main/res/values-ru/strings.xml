@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">GPS-трекер</string>
+    <string name="map">Карта</string>
+    <string name="alarms">Будильники</string>
+    <string name="my_tracks">Мои треки</string>
+    <string name="settings">Настройки</string>
+    <string name="location_not_granted">Необходимо дать разрешение :(</string>
+    <string name="search">Поиск</string>
+    <string name="search_address">Поиск адреса</string>
+    <string name="recent">Недавние</string>
+    <string name="favourite">Избранное</string>
+    <string name="removed_favourite">Адрес был удален из избранных</string>
+    <string name="cancel">Отменить</string>
+</resources>
