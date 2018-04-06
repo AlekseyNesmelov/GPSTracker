@@ -9,6 +9,8 @@ import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.constraint.ConstraintLayout;
+import android.support.design.widget.BottomSheetBehavior;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
@@ -18,12 +20,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
-import android.widget.FrameLayout;
 
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.nesmelov.alexey.gpstracker.R;
 import com.nesmelov.alexey.gpstracker.application.TrackerApplication;
@@ -59,6 +59,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @BindView(R.id.searchPlaceBtn) FloatingActionButton mSearchPlaceBtn;
     @BindView(R.id.zoomInBtn) FloatingActionButton mZoomInBtn;
     @BindView(R.id.zoomOutBtn) FloatingActionButton mZoomOutBtn;
+    @BindView(R.id.bottom_sheet) ConstraintLayout mBottomSheet;
 
     private GoogleMap mMap;
 
@@ -71,8 +72,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private Observable<View> mZoomInClickObservable;
     private Observable<View> mZoomOutClickObservable;
 
-    private Animation mShowSearchAnim;
-    private Animation mHideSearchAnim;
+    private Animation mFadeInAnim;
+    private Animation mFadeOutAnim;
 
     /**
      * Returns an instance of the map fragment.
@@ -88,8 +89,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         super.onCreate(savedInstanceState);
         TrackerApplication.getMapUtilsComp().inject(this);
         TrackerApplication.getLocationUtilsComp().inject(this);
-        mShowSearchAnim = AnimationUtils.loadAnimation(getActivity(), R.anim.fab_search_show);
-        mHideSearchAnim = AnimationUtils.loadAnimation(getActivity(), R.anim.fab_search_hide);
+        mFadeInAnim = AnimationUtils.loadAnimation(getActivity(), android.R.anim.fade_in);
+        mFadeOutAnim = AnimationUtils.loadAnimation(getActivity(), android.R.anim.fade_out);
     }
 
     @Nullable
@@ -120,6 +121,29 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         mMenuClickObservable = createClickObservable(mMenuFab);
         mZoomInClickObservable = createClickObservable(mZoomInBtn);
         mZoomOutClickObservable = createClickObservable(mZoomOutBtn);
+
+        final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
+        bottomSheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+            @Override
+            public void onStateChanged(@NonNull View bottomSheet, int newState) {
+                if (newState == BottomSheetBehavior.STATE_COLLAPSED) {
+                    mViewModel.getMenuOpenedState().setValue(false);
+                    mFollowMeBtn.setVisibility(View.VISIBLE);//.startAnimation(mFadeInAnim);
+                    mZoomInBtn.setVisibility(View.VISIBLE);//.startAnimation(mFadeInAnim);
+                    mZoomOutBtn.setVisibility(View.VISIBLE);//.startAnimation(mFadeInAnim);
+                } else if (newState == BottomSheetBehavior.STATE_EXPANDED) {
+                    mViewModel.getMenuOpenedState().setValue(true);
+                    mFollowMeBtn.setVisibility(View.GONE);//.startAnimation(mFadeOutAnim);
+                    mZoomInBtn.setVisibility(View.GONE);//.startAnimation(mFadeOutAnim);
+                    mZoomOutBtn.setVisibility(View.GONE);//.startAnimation(mFadeOutAnim);
+                }
+            }
+
+            @Override
+            public void onSlide(@NonNull View bottomSheet, float slideOffset) {
+
+            }
+        });
     }
 
     @Override
@@ -230,15 +254,21 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
      * @param isMenuOpened <tt>true</tt> if menu is opened.
      */
     private void updateMenuOpenedState(final boolean isMenuOpened) {
+        final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
+        if (isMenuOpened) {
+            bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+        } else {
+            bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+        }
         if (getActivity() != null) {
             mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(),
                     isMenuOpened ? R.drawable.ic_close_black_24dp : R.drawable.ic_reorder_black_24dp));
         }
-        final FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) mSearchPlaceBtn.getLayoutParams();
+        /*final FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) mSearchPlaceBtn.getLayoutParams();
         int param = isMenuOpened ? 1 : -1;
         layoutParams.rightMargin += (int) (param * mSearchPlaceBtn.getWidth() * 1.7);
         layoutParams.bottomMargin += (int) (param * mSearchPlaceBtn.getHeight() * 0.25);
         mSearchPlaceBtn.setLayoutParams(layoutParams);
-        mSearchPlaceBtn.startAnimation(isMenuOpened ? mShowSearchAnim : mHideSearchAnim);
+        mSearchPlaceBtn.startAnimation(isMenuOpened ? mShowSearchAnim : mHideSearchAnim);*/
     }
 }

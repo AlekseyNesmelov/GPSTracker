@@ -43,9 +43,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="20dp"
-        android:layout_gravity="bottom|end"
+        app:layout_anchor="@id/bottom_sheet"
+        app:layout_anchorGravity="end|right"
         android:src="@drawable/ic_reorder_black_24dp"/>
 
     <include layout="@layout/fab_menu_layout" />
+
+    <include layout="@layout/bottom_sheet" />
 
 </android.support.design.widget.CoordinatorLayout>
