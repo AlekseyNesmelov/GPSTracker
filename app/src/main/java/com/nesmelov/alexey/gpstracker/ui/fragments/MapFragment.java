@@ -15,6 +15,11 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
+import android.support.v7.util.DiffUtil;
+import android.support.v7.widget.CardView;
+import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -30,8 +35,16 @@ import com.nesmelov.alexey.gpstracker.application.TrackerApplication;
 import com.nesmelov.alexey.gpstracker.application.utils.LocationUtils;
 import com.nesmelov.alexey.gpstracker.application.utils.MapUtils;
 import com.nesmelov.alexey.gpstracker.application.utils.Position;
+import com.nesmelov.alexey.gpstracker.repository.storage.model.Address;
+import com.nesmelov.alexey.gpstracker.repository.storage.model.Alarm;
 import com.nesmelov.alexey.gpstracker.ui.activities.SearchActivity;
+import com.nesmelov.alexey.gpstracker.ui.adapters.AddressListAdapter;
+import com.nesmelov.alexey.gpstracker.ui.adapters.HorizontalAlarmAdapter;
+import com.nesmelov.alexey.gpstracker.ui.utils.AddressesDiffUtilsCallback;
+import com.nesmelov.alexey.gpstracker.ui.utils.AlarmDiffUtilsCallback;
 import com.nesmelov.alexey.gpstracker.viewmodels.MapFragmentViewModel;
+
+import java.util.List;
 
 import javax.inject.Inject;
 
@@ -56,24 +69,24 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @BindView(R.id.mapView) MapView mMapView;
     @BindView(R.id.menuBtn) FloatingActionButton mMenuFab;
     @BindView(R.id.followMeBtn) FloatingActionButton mFollowMeBtn;
-    @BindView(R.id.searchPlaceBtn) FloatingActionButton mSearchPlaceBtn;
     @BindView(R.id.zoomInBtn) FloatingActionButton mZoomInBtn;
     @BindView(R.id.zoomOutBtn) FloatingActionButton mZoomOutBtn;
     @BindView(R.id.bottom_sheet) ConstraintLayout mBottomSheet;
+    @BindView(R.id.searchCard) CardView mSearchCard;
+    @BindView(R.id.alarmsHorizontalView) RecyclerView mAlarmsView;
 
     private GoogleMap mMap;
 
     private MapFragmentViewModel mViewModel;
 
     private CompositeDisposable mCompositeDisposable;
-    private Observable<View> mSearchBtnClickObservable;
     private Observable<View> mFollowMeClickObservable;
     private Observable<View> mMenuClickObservable;
     private Observable<View> mZoomInClickObservable;
     private Observable<View> mZoomOutClickObservable;
+    private Observable<View> mSearchCardClickObservable;
 
-    private Animation mFadeInAnim;
-    private Animation mFadeOutAnim;
+    private HorizontalAlarmAdapter mHorizontalAlarmAdapter;
 
     /**
      * Returns an instance of the map fragment.
@@ -89,8 +102,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         super.onCreate(savedInstanceState);
         TrackerApplication.getMapUtilsComp().inject(this);
         TrackerApplication.getLocationUtilsComp().inject(this);
-        mFadeInAnim = AnimationUtils.loadAnimation(getActivity(), android.R.anim.fade_in);
-        mFadeOutAnim = AnimationUtils.loadAnimation(getActivity(), android.R.anim.fade_out);
     }
 
     @Nullable
@@ -112,15 +123,21 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
     @Override
     public void onViewCreated(@NonNull final View view, @Nullable final Bundle savedInstanceState) {
+        mHorizontalAlarmAdapter = new HorizontalAlarmAdapter();
+        mAlarmsView.setLayoutManager(new LinearLayoutManager(getActivity(),
+                LinearLayoutManager.HORIZONTAL, false));
+        mAlarmsView.setAdapter(mHorizontalAlarmAdapter);
+
         mViewModel = ViewModelProviders.of(this).get(MapFragmentViewModel.class);
         mViewModel.getFollowMeState().observe(this, this::updateFollowMeState);
         mViewModel.getMenuOpenedState().observe(this, this::updateMenuOpenedState);
+        mViewModel.getAlarms().observe(this, this::showAlarms);
 
-        mSearchBtnClickObservable = createClickObservable(mSearchPlaceBtn);
         mFollowMeClickObservable = createClickObservable(mFollowMeBtn);
         mMenuClickObservable = createClickObservable(mMenuFab);
         mZoomInClickObservable = createClickObservable(mZoomInBtn);
         mZoomOutClickObservable = createClickObservable(mZoomOutBtn);
+        mSearchCardClickObservable = createClickObservable(mSearchCard);
 
         final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
         bottomSheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
@@ -128,20 +145,13 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             public void onStateChanged(@NonNull View bottomSheet, int newState) {
                 if (newState == BottomSheetBehavior.STATE_COLLAPSED) {
                     mViewModel.getMenuOpenedState().setValue(false);
-                    mFollowMeBtn.setVisibility(View.VISIBLE);//.startAnimation(mFadeInAnim);
-                    mZoomInBtn.setVisibility(View.VISIBLE);//.startAnimation(mFadeInAnim);
-                    mZoomOutBtn.setVisibility(View.VISIBLE);//.startAnimation(mFadeInAnim);
                 } else if (newState == BottomSheetBehavior.STATE_EXPANDED) {
                     mViewModel.getMenuOpenedState().setValue(true);
-                    mFollowMeBtn.setVisibility(View.GONE);//.startAnimation(mFadeOutAnim);
-                    mZoomInBtn.setVisibility(View.GONE);//.startAnimation(mFadeOutAnim);
-                    mZoomOutBtn.setVisibility(View.GONE);//.startAnimation(mFadeOutAnim);
                 }
             }
 
             @Override
             public void onSlide(@NonNull View bottomSheet, float slideOffset) {
-
             }
         });
     }
@@ -157,7 +167,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         mCompositeDisposable.add(mFollowMeClickObservable.subscribe(v -> mViewModel.clickFollowMe()));
         mCompositeDisposable.add(mZoomInClickObservable.subscribe(v -> mMapUtils.zoomIn(mMap)));
         mCompositeDisposable.add(mZoomOutClickObservable.subscribe(v -> mMapUtils.zoomOut(mMap)));
-        mCompositeDisposable.add(mSearchBtnClickObservable.subscribe(v -> startActivityForResult(
+        mCompositeDisposable.add(mSearchCardClickObservable.subscribe(v -> startActivityForResult(
                 new Intent(getContext(), SearchActivity.class), REQUEST_CODE_SEARCH_PLACE)));
     }
 
@@ -264,11 +274,17 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(),
                     isMenuOpened ? R.drawable.ic_close_black_24dp : R.drawable.ic_reorder_black_24dp));
         }
-        /*final FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) mSearchPlaceBtn.getLayoutParams();
-        int param = isMenuOpened ? 1 : -1;
-        layoutParams.rightMargin += (int) (param * mSearchPlaceBtn.getWidth() * 1.7);
-        layoutParams.bottomMargin += (int) (param * mSearchPlaceBtn.getHeight() * 0.25);
-        mSearchPlaceBtn.setLayoutParams(layoutParams);
-        mSearchPlaceBtn.startAnimation(isMenuOpened ? mShowSearchAnim : mHideSearchAnim);*/
+    }
+
+    private void showAlarms(final List<Alarm> alarms) {
+        showAlarmsByDiff(alarms, mHorizontalAlarmAdapter);
+    }
+
+    private void showAlarmsByDiff(final List<Alarm> alarms, final HorizontalAlarmAdapter adapter) {
+        final AlarmDiffUtilsCallback diffUtilCallback = new AlarmDiffUtilsCallback(
+                adapter.getData(), alarms);
+        final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(diffUtilCallback);
+        adapter.setData(alarms);
+        diffResult.dispatchUpdatesTo(adapter);
     }
 }

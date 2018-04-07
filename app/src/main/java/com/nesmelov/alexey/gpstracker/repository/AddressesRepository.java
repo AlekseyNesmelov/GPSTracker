@@ -4,6 +4,7 @@ import android.location.Geocoder;
 
 import com.nesmelov.alexey.gpstracker.repository.storage.AppDatabase;
 import com.nesmelov.alexey.gpstracker.repository.storage.model.Address;
+import com.nesmelov.alexey.gpstracker.repository.storage.model.Alarm;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,6 +71,23 @@ public class AddressesRepository implements IAddressesRepository {
     public Completable updateAddressFavourite(final Address address) {
         return Completable.create(emitter -> mDatabase.addressDao()
                 .updateAddressFavourite(address.name, address.favourite))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread());
+    }
+
+    @Override
+    public Flowable<List<Alarm>> getAlarms() {
+        return mDatabase.alarmDao().getAlarms();
+    }
+
+    @Override
+    public Flowable<List<Alarm>> getTurnedOnAlarms() {
+        return mDatabase.alarmDao().getTurnedOnAlarms();
+    }
+
+    @Override
+    public Completable addAlarm(Alarm alarm) {
+        return Completable.create(emitter -> mDatabase.alarmDao().insert(alarm))
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread());
     }

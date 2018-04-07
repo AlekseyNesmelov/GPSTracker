@@ -75,7 +75,7 @@ public class AddressesFragment extends Fragment {
             final ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.Callback() {
                 @Override
                 public int getMovementFlags(final RecyclerView recyclerView, final RecyclerView.ViewHolder viewHolder) {
-                    return  makeMovementFlags(0, LEFT | RIGHT);
+                    return  makeMovementFlags(0, LEFT);
                 }
 
                 @Override

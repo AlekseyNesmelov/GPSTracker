@@ -1,6 +1,7 @@
 package com.nesmelov.alexey.gpstracker.repository;
 
 import com.nesmelov.alexey.gpstracker.repository.storage.model.Address;
+import com.nesmelov.alexey.gpstracker.repository.storage.model.Alarm;
 
 import java.util.List;
 
@@ -15,21 +16,21 @@ public interface IAddressesRepository {
     /**
      * Gets recent addresses.
      *
-     * @return live data of recent addresses.
+     * @return flowable of recent addresses.
      */
     Flowable<List<Address>> getRecentAddresses();
 
     /**
      * Gets favourite addresses.
      *
-     * @return live data of favourite addresses.
+     * @return flowable of favourite addresses.
      */
     Flowable<List<Address>> getFavouriteAddresses();
 
     /**
      * Gets live data of addresses by place.
      *
-     * @return live data of addresses by place.
+     * @return observable of addresses by place.
      */
     Observable<List<Address>> getAddressesByPlace(final String place);
 
@@ -48,4 +49,26 @@ public interface IAddressesRepository {
      * @return completable of the action.
      */
     Completable updateAddressFavourite(final Address address);
+
+    /**
+     * Gets alarms.
+     *
+     * @return flowable of alarms.
+     */
+    Flowable<List<Alarm>> getAlarms();
+
+    /**
+     * Gets turned on alarms.
+     *
+     * @return flowable of turned on alarms.
+     */
+    Flowable<List<Alarm>> getTurnedOnAlarms();
+
+    /**
+     * Adds a new alarm to the repository.
+     *
+     * @param alarm alarm to add.
+     * @return completable of the action.
+     */
+    Completable addAlarm(final Alarm alarm);
 }

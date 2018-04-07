@@ -6,32 +6,34 @@
 
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/followMeBtn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
         android:src="@drawable/ic_my_location_off_black_48dp"
         android:layout_margin="20dp"
         android:layout_gravity="end|top"
-        app:fabSize="mini"/>
+        app:layout_behavior="com.nesmelov.alexey.gpstracker.ui.behavior.MapControlBehavior" />
 
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/zoomInBtn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
         android:src="@drawable/ic_add_black_24dp"
-        android:layout_marginTop="70dp"
+        android:layout_marginTop="80dp"
         android:layout_marginEnd="20dp"
         android:layout_gravity="end|top"
-        app:fabSize="mini"/>
+        app:fabSize="mini"
+        app:layout_behavior="com.nesmelov.alexey.gpstracker.ui.behavior.MapControlBehavior"/>
 
     <android.support.design.widget.FloatingActionButton
         android:id="@+id/zoomOutBtn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
         android:src="@drawable/ic_remove_black_24dp"
-        android:layout_marginTop="120dp"
+        android:layout_marginTop="140dp"
         android:layout_marginEnd="20dp"
         android:layout_gravity="end|top"
-        app:fabSize="mini"/>
+        app:fabSize="mini"
+        app:layout_behavior="com.nesmelov.alexey.gpstracker.ui.behavior.MapControlBehavior"/>
 
     <com.google.android.gms.maps.MapView
         android:id="@+id/mapView"
