@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.arch.lifecycle.ViewModelProviders;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -17,30 +18,30 @@ import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.util.DiffUtil;
 import android.support.v7.widget.CardView;
-import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.Animation;
-import android.view.animation.AnimationUtils;
+import android.widget.ImageView;
+import android.widget.SeekBar;
 
+import com.google.android.gms.maps.CameraUpdate;
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.nesmelov.alexey.gpstracker.R;
 import com.nesmelov.alexey.gpstracker.application.TrackerApplication;
 import com.nesmelov.alexey.gpstracker.application.utils.LocationUtils;
 import com.nesmelov.alexey.gpstracker.application.utils.MapUtils;
 import com.nesmelov.alexey.gpstracker.application.utils.Position;
-import com.nesmelov.alexey.gpstracker.repository.storage.model.Address;
 import com.nesmelov.alexey.gpstracker.repository.storage.model.Alarm;
 import com.nesmelov.alexey.gpstracker.ui.activities.SearchActivity;
-import com.nesmelov.alexey.gpstracker.ui.adapters.AddressListAdapter;
 import com.nesmelov.alexey.gpstracker.ui.adapters.HorizontalAlarmAdapter;
-import com.nesmelov.alexey.gpstracker.ui.utils.AddressesDiffUtilsCallback;
 import com.nesmelov.alexey.gpstracker.ui.utils.AlarmDiffUtilsCallback;
 import com.nesmelov.alexey.gpstracker.viewmodels.MapFragmentViewModel;
 
@@ -74,8 +75,13 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @BindView(R.id.bottom_sheet) ConstraintLayout mBottomSheet;
     @BindView(R.id.searchCard) CardView mSearchCard;
     @BindView(R.id.alarmsHorizontalView) RecyclerView mAlarmsView;
+    @BindView(R.id.add_alarm_btn) FloatingActionButton mAddAlarmBtn;
+    @BindView(R.id.okBtn) FloatingActionButton mOkBtn;
+    @BindView(R.id.alarm_target) ImageView mAlarmTarget;
+    @BindView(R.id.radiusSeekBar) SeekBar mRadiusSeekBar;
 
     private GoogleMap mMap;
+    private Circle mAlarmRadius;
 
     private MapFragmentViewModel mViewModel;
 
@@ -85,6 +91,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private Observable<View> mZoomInClickObservable;
     private Observable<View> mZoomOutClickObservable;
     private Observable<View> mSearchCardClickObservable;
+    private Observable<View> mAddAlarmBtnClickObservable;
+    private Observable<View> mOkBtnClickObservable;
 
     private HorizontalAlarmAdapter mHorizontalAlarmAdapter;
 
@@ -123,6 +131,11 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
     @Override
     public void onViewCreated(@NonNull final View view, @Nullable final Bundle savedInstanceState) {
+        mAlarmTarget.bringToFront();
+        mRadiusSeekBar.bringToFront();
+        mOkBtn.bringToFront();
+        mBottomSheet.bringToFront();
+
         mHorizontalAlarmAdapter = new HorizontalAlarmAdapter();
         mAlarmsView.setLayoutManager(new LinearLayoutManager(getActivity(),
                 LinearLayoutManager.HORIZONTAL, false));
@@ -130,28 +143,52 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
         mViewModel = ViewModelProviders.of(this).get(MapFragmentViewModel.class);
         mViewModel.getFollowMeState().observe(this, this::updateFollowMeState);
-        mViewModel.getMenuOpenedState().observe(this, this::updateMenuOpenedState);
         mViewModel.getAlarms().observe(this, this::showAlarms);
+        mViewModel.getMode().observe(this, this::modeChanged);
 
         mFollowMeClickObservable = createClickObservable(mFollowMeBtn);
         mMenuClickObservable = createClickObservable(mMenuFab);
         mZoomInClickObservable = createClickObservable(mZoomInBtn);
         mZoomOutClickObservable = createClickObservable(mZoomOutBtn);
         mSearchCardClickObservable = createClickObservable(mSearchCard);
+        mAddAlarmBtnClickObservable = createClickObservable(mAddAlarmBtn);
+        mOkBtnClickObservable = createClickObservable(mOkBtn);
 
         final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
         bottomSheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
             @Override
             public void onStateChanged(@NonNull View bottomSheet, int newState) {
                 if (newState == BottomSheetBehavior.STATE_COLLAPSED) {
-                    mViewModel.getMenuOpenedState().setValue(false);
+                    mViewModel.menuClosed();
                 } else if (newState == BottomSheetBehavior.STATE_EXPANDED) {
-                    mViewModel.getMenuOpenedState().setValue(true);
+                    mViewModel.menuOpened();
                 }
             }
 
             @Override
             public void onSlide(@NonNull View bottomSheet, float slideOffset) {
+            }
+        });
+
+        mRadiusSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser) {
+                final float radius = progress + 10;
+                if (mAlarmRadius != null) {
+                    mAlarmRadius.setRadius(radius);
+                }
+                if (mAlarmRadius != null) {
+                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(
+                            mAlarmRadius.getCenter(), mMapUtils.getZoomLevel(mAlarmRadius)));
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(final SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(final SeekBar seekBar) {
             }
         });
     }
@@ -163,8 +200,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         mMapView.getMapAsync(this);
 
         mCompositeDisposable = new CompositeDisposable();
+        mCompositeDisposable.add(mOkBtnClickObservable.subscribe(v -> mViewModel.clickOk()));
         mCompositeDisposable.add(mMenuClickObservable.subscribe(v-> mViewModel.clickMenu()));
         mCompositeDisposable.add(mFollowMeClickObservable.subscribe(v -> mViewModel.clickFollowMe()));
+        mCompositeDisposable.add(mAddAlarmBtnClickObservable.subscribe(v -> mViewModel.clickAddAlarm()));
         mCompositeDisposable.add(mZoomInClickObservable.subscribe(v -> mMapUtils.zoomIn(mMap)));
         mCompositeDisposable.add(mZoomOutClickObservable.subscribe(v -> mMapUtils.zoomOut(mMap)));
         mCompositeDisposable.add(mSearchCardClickObservable.subscribe(v -> startActivityForResult(
@@ -258,25 +297,81 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
-    /**
-     * Updates ui by menu opened state.
-     *
-     * @param isMenuOpened <tt>true</tt> if menu is opened.
-     */
-    private void updateMenuOpenedState(final boolean isMenuOpened) {
-        final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
-        if (isMenuOpened) {
-            bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-        } else {
-            bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
-        }
+    private void modeChanged(final int mode) {
         if (getActivity() != null) {
-            mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(),
-                    isMenuOpened ? R.drawable.ic_close_black_24dp : R.drawable.ic_reorder_black_24dp));
+            final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
+
+            switch (mode) {
+                case MapFragmentViewModel.MODE_MENU_CLOSED:
+                    if (mAlarmRadius != null) {
+                        mAlarmRadius.setVisible(false);
+                    }
+                    mAlarmTarget.setVisibility(View.GONE);
+                    mRadiusSeekBar.setVisibility(View.GONE);
+                    if (mOkBtn.getVisibility() == View.VISIBLE) {
+                        mOkBtn.hide();
+                    }
+                    bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                    mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_reorder_black_24dp));
+                    break;
+                case MapFragmentViewModel.MODE_MENU_OPENED:
+                    if (mAlarmRadius != null) {
+                        mAlarmRadius.setVisible(false);
+                    }
+                    mAlarmTarget.setVisibility(View.GONE);
+                    mRadiusSeekBar.setVisibility(View.GONE);
+                    if (mOkBtn.getVisibility() == View.VISIBLE) {
+                        mOkBtn.hide();
+                    }
+                    bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+                    mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_close_black_24dp));
+                    break;
+                case MapFragmentViewModel.MODE_ALARM_POS:
+                    if (mAlarmRadius != null) {
+                        mAlarmRadius.setVisible(false);
+                    }
+                    mRadiusSeekBar.setVisibility(View.GONE);
+                    mAlarmTarget.setVisibility(View.VISIBLE);
+                    if (mOkBtn.getVisibility() != View.VISIBLE) {
+                        mOkBtn.show();
+                    }
+                    bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                    mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_close_black_24dp));
+                    break;
+                case MapFragmentViewModel.MODE_ALARM_RADIUS:
+                    if (mMap != null) {
+                        mAlarmRadius = mMap.addCircle(new CircleOptions()
+                                .center(mMap.getCameraPosition().target)
+                                .visible(true)
+                                .fillColor(Color.argb(128, 255, 152, 0))
+                                .strokeColor(Color.argb(128, 230, 81, 0))
+                                .strokeWidth(7)
+                                .radius(1000)
+                        );
+                        final LatLng latLng = mMap.getCameraPosition().target;
+                        final CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng,
+                                mMapUtils.getZoomLevel(mAlarmRadius));
+                        mMap.animateCamera(cameraUpdate);
+                    }
+
+                    mRadiusSeekBar.setVisibility(View.VISIBLE);
+                    mAlarmTarget.setVisibility(View.GONE);
+                    if (mOkBtn.getVisibility() != View.VISIBLE) {
+                        mOkBtn.show();
+                    }
+                    bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                    mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_close_black_24dp));
+                    break;
+                default:
+                    break;
+            }
         }
     }
 
-    private void showAlarms(final List<Alarm> alarms) {
+    private void
+
+
+    showAlarms(final List<Alarm> alarms) {
         showAlarmsByDiff(alarms, mHorizontalAlarmAdapter);
     }
 

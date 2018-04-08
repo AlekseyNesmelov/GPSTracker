@@ -44,23 +44,6 @@ public class AddressesRepository implements IAddressesRepository {
     }
 
     @Override
-    public Observable<List<Address>> getAddressesByPlace(final String place) {
-        return Observable.fromCallable(() -> {
-            final List<android.location.Address> addresses = mGeocoder.getFromLocationName(place, MAX_SEARCH_RESULTS);
-            if (addresses == null) {
-                return new ArrayList<android.location.Address>();
-            }
-            return addresses;
-        }).map(addresses -> {
-            final List<Address> result = new ArrayList<>();
-            for (final android.location.Address a : addresses) {
-                result.add(Address.fromGeoAddress(a));
-            }
-            return result;
-        }).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread());
-    }
-
-    @Override
     public Completable addAddress(final Address address) {
         return Completable.create(emitter -> mDatabase.addressDao().insert(address))
                 .subscribeOn(Schedulers.io())

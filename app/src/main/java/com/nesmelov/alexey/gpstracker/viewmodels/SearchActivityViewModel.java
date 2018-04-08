@@ -83,23 +83,6 @@ public class SearchActivityViewModel extends ViewModel {
     }
 
     /**
-     * Request found addresses to update by input place.
-     *
-     * @param place place to find addresses.
-     */
-    public void requestPlace(final String place) {
-        if (mGeocoderDisposable != null) {
-            mGeocoderDisposable.dispose();
-        }
-        if (place.isEmpty()) {
-            mFoundAddresses.setValue(new ArrayList<>());
-        } else {
-            mGeocoderDisposable = mAddressesRepository.getAddressesByPlace(place)
-                    .subscribe(mFoundAddresses::setValue);
-        }
-    }
-
-    /**
      * Adds a new address to the repository.
      *
      * @param address address to add.

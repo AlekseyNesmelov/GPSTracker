@@ -28,13 +28,6 @@ public interface IAddressesRepository {
     Flowable<List<Address>> getFavouriteAddresses();
 
     /**
-     * Gets live data of addresses by place.
-     *
-     * @return observable of addresses by place.
-     */
-    Observable<List<Address>> getAddressesByPlace(final String place);
-
-    /**
      * Adds a new address to the repository.
      *
      * @param address address to add.

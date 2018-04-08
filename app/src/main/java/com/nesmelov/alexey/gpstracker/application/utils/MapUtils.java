@@ -5,6 +5,7 @@ import android.location.Location;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.LatLng;
 
 import javax.inject.Inject;
@@ -129,5 +130,21 @@ public class MapUtils {
                 updateZoom(map, cameraZoom - 1);
             }
         }
+    }
+
+    /**
+     * Gets zoom level for current circle.
+     *
+     * @param circle circle to calculate zoom.
+     * @return zoom level for current circle.
+     */
+    public float getZoomLevel(final Circle circle) {
+        float zoomLevel = 11;
+        if (circle != null) {
+            double radius = circle.getRadius() + circle.getRadius() / 2;
+            double scale = radius / 300;
+            zoomLevel = (float) (16 - Math.log(scale) / Math.log(2));
+        }
+        return zoomLevel;
     }
 }

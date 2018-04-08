@@ -2,20 +2,17 @@ package com.nesmelov.alexey.gpstracker.viewmodels;
 
 import android.arch.lifecycle.MutableLiveData;
 import android.arch.lifecycle.ViewModel;
-import android.location.Location;
 
-import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.nesmelov.alexey.gpstracker.application.TrackerApplication;
-import com.nesmelov.alexey.gpstracker.application.utils.LocationUtils;
 import com.nesmelov.alexey.gpstracker.repository.AddressesRepository;
-import com.nesmelov.alexey.gpstracker.repository.storage.model.Address;
 import com.nesmelov.alexey.gpstracker.repository.storage.model.Alarm;
 
 import java.util.List;
 
 import javax.inject.Inject;
 
+import io.reactivex.Scheduler;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.schedulers.Schedulers;
 
@@ -24,12 +21,17 @@ import io.reactivex.schedulers.Schedulers;
  */
 public class MapFragmentViewModel extends ViewModel {
 
+    public static final int MODE_MENU_CLOSED = 0;
+    public static final int MODE_MENU_OPENED = 1;
+    public static final int MODE_ALARM_POS = 2;
+    public static final int MODE_ALARM_RADIUS = 3;
+
     @Inject
     AddressesRepository mAddressesRepository;
 
-    private MutableLiveData<Boolean> mIsMenuOpened;
     private MutableLiveData<Boolean> mIsFollowMe;
     private MutableLiveData<LatLng> mCameraPos;
+    private MutableLiveData<Integer> mMode;
 
     private MutableLiveData<List<Alarm>> mAlarms;
 
@@ -61,18 +63,6 @@ public class MapFragmentViewModel extends ViewModel {
     }
 
     /**
-     * Returns live data for menu state.
-     *
-     * @return live data for menu state.
-     */
-    public MutableLiveData<Boolean> getMenuOpenedState() {
-        if (mIsMenuOpened == null) {
-            mIsMenuOpened = new MutableLiveData<>();
-        }
-        return mIsMenuOpened;
-    }
-
-    /**
      * Returns live data for follow me state.
      *
      * @return live data for follow me state.
@@ -84,12 +74,67 @@ public class MapFragmentViewModel extends ViewModel {
         return mIsFollowMe;
     }
 
+    public MutableLiveData<Integer> getMode() {
+        if (mMode == null) {
+            mMode = new MutableLiveData<>();
+            mMode.setValue(MODE_MENU_CLOSED);
+        }
+        return mMode;
+    }
+
+    public void menuOpened() {
+        final Integer mode = getMode().getValue();
+        if (mode != null && mode == MODE_MENU_CLOSED) {
+            getMode().setValue(MODE_MENU_OPENED);
+        }
+    }
+
+    public void menuClosed() {
+        final Integer mode = getMode().getValue();
+        if (mode != null && mode == MODE_MENU_OPENED) {
+            getMode().setValue(MODE_MENU_CLOSED);
+        }
+    }
+
     /**
      * Click menu event.
      */
     public void clickMenu() {
-        final Boolean prevState = getMenuOpenedState().getValue();
-        getMenuOpenedState().setValue(prevState == null || !prevState);
+        final Integer mode = getMode().getValue();
+        if (mode != null) {
+            switch (mode) {
+                case MODE_MENU_CLOSED:
+                    getMode().setValue(MODE_MENU_OPENED);
+                    break;
+                case MODE_MENU_OPENED:
+                    getMode().setValue(MODE_MENU_CLOSED);
+                    break;
+                case MODE_ALARM_RADIUS:
+                    getMode().setValue(MODE_MENU_CLOSED);
+                    break;
+                default:
+                    getMode().setValue(MODE_MENU_CLOSED);
+                    break;
+            }
+        }
+    }
+
+    public void clickOk() {
+        final Integer mode = getMode().getValue();
+        if (mode != null) {
+            switch (mode) {
+                case MODE_ALARM_POS:
+                    getMode().setValue(MODE_ALARM_RADIUS);
+                    break;
+                case MODE_ALARM_RADIUS:
+                    // TODO: add alarm
+                    mAddressesRepository.addAlarm(new Alarm()).subscribe();
+                    getMode().setValue(MODE_MENU_CLOSED);
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 
     /**
@@ -98,5 +143,9 @@ public class MapFragmentViewModel extends ViewModel {
     public void clickFollowMe() {
         final Boolean prevState = getFollowMeState().getValue();
         getFollowMeState().setValue(prevState == null || !prevState);
+    }
+
+    public void clickAddAlarm() {
+        getMode().setValue(MODE_ALARM_POS);
     }
 }

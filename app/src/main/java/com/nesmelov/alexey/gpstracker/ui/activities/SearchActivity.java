@@ -13,11 +13,17 @@ import android.support.v7.util.DiffUtil;
 import android.support.v7.widget.DividerItemDecoration;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.Toolbar;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.ui.PlaceAutocompleteFragment;
+import com.google.android.gms.location.places.ui.PlaceSelectionListener;
 import com.nesmelov.alexey.gpstracker.R;
 import com.nesmelov.alexey.gpstracker.repository.storage.model.Address;
 import com.nesmelov.alexey.gpstracker.ui.adapters.AddressListAdapter;
@@ -38,24 +44,20 @@ import io.reactivex.Observable;
 import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 
 public class SearchActivity extends AppCompatActivity {
 
-    private static final int SEARCH_TIMEOUT = 500;
-
-    @BindView(R.id.searchTextView)EditText mSearchView;
     @BindView(R.id.tabLayout)TabLayout mTabLayout;
     @BindView(R.id.viewPager)ViewPager mViewPager;
     @BindView(R.id.geocoderList) RecyclerView mFoundAddressListView;
+    @BindView(R.id.my_toolbar) Toolbar mToolbar;
 
     private CompositeDisposable mCompositeDisposable;
-    private Observable<Boolean> mSearchFocusObservable;
-    private Flowable<String> mSearchTextChangedObservable;
+    private Observable<Place> mPlaceSelectedObservable;
+    private Disposable mPlaceSelectedDisposable;
 
-    private TextWatcher mTextWatcher;
-
-    private AddressListAdapter mFoundAddressListAdapter;
     private AddressListAdapter mRecentsAddressesListAdapter;
     private AddressListAdapter mFavouriteAddressesListAdapter;
 
@@ -70,57 +72,49 @@ public class SearchActivity extends AppCompatActivity {
         mViewModel = ViewModelProviders.of(this).get(SearchActivityViewModel.class);
         mViewModel.getRecentAddresses().observe(this, this::showRecentAddresses);
         mViewModel.getFavouriteAddresses().observe(this, this::showFavouriteAddresses);
-        mViewModel.getFoundAddresses().observe(this, this::showFoundAddresses);
+
+        final PlaceAutocompleteFragment autocompleteFragment = (PlaceAutocompleteFragment)
+                getFragmentManager().findFragmentById(R.id.place_autocomplete_fragment);
+
+        mPlaceSelectedObservable = Observable.create((ObservableOnSubscribe<Place>) emitter -> {
+            emitter.setCancellable(() -> {
+                if (autocompleteFragment != null) {
+                    autocompleteFragment.setOnPlaceSelectedListener(null);
+                }
+            });
+            autocompleteFragment.setOnPlaceSelectedListener(new PlaceSelectionListener() {
+                @Override
+                public void onPlaceSelected(final Place place) {
+                    emitter.onNext(place);
+                }
+
+                @Override
+                public void onError(Status status) {
+                    // TODO: Handle the error.
+                }
+            });
+        }).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread());
 
         mFavouriteAddressesListAdapter = new AddressListAdapter(false);
         mRecentsAddressesListAdapter = new AddressListAdapter(true);
-        mFoundAddressListAdapter = new AddressListAdapter(true);
-
-        mFoundAddressListView.addItemDecoration(new DividerItemDecoration(this,
-                DividerItemDecoration.VERTICAL));
-        mFoundAddressListView.setLayoutManager(new LinearLayoutManager(this,
-                LinearLayoutManager.VERTICAL, false));
-        mFoundAddressListView.setAdapter(mFoundAddressListAdapter);
-
-        mSearchFocusObservable = Observable.create((ObservableOnSubscribe<Boolean>) emitter -> {
-            emitter.setCancellable(() -> mSearchView.setOnFocusChangeListener(null));
-            mSearchView.setOnFocusChangeListener((v, hasFocus) -> emitter.onNext(hasFocus));
-        }).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread());
-
-        mSearchTextChangedObservable = Flowable.create((FlowableOnSubscribe<String>) emitter -> {
-            emitter.setCancellable(() -> {
-                if (mTextWatcher != null) {
-                    mSearchView.removeTextChangedListener(mTextWatcher);
-                    mTextWatcher = null;
-                }
-            });
-            mTextWatcher = new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-                }
-
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {
-                    emitter.onNext(s.toString());
-                }
-
-                @Override
-                public void afterTextChanged(Editable s) {
-                }
-            };
-            mSearchView.addTextChangedListener(mTextWatcher);
-        }, BackpressureStrategy.MISSING).debounce(SEARCH_TIMEOUT, TimeUnit.MILLISECONDS)
-                .subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread());
 
         setupViewPager();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        mPlaceSelectedDisposable = mPlaceSelectedObservable.subscribe(place -> {
+            final Address address = Address.fromGeoAddress(place);
+            mViewModel.addAddress(address);
+            completeWithAddress(address);
+        });
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         mCompositeDisposable = new CompositeDisposable();
-        mCompositeDisposable.add(mSearchFocusObservable.subscribe(this::onFocusChanged));
-        mCompositeDisposable.add(mSearchTextChangedObservable.subscribe(mViewModel::requestPlace));
         mCompositeDisposable.add(mFavouriteAddressesListAdapter.getClickedAddressObservable()
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
@@ -133,17 +127,6 @@ public class SearchActivity extends AppCompatActivity {
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(mViewModel::updateAddressFavourite));
-        mCompositeDisposable.add(mFoundAddressListAdapter.getClickedAddressObservable()
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(address -> {
-                    mViewModel.addAddress(address);
-                    completeWithAddress(address);
-                }));
-        mCompositeDisposable.add(mFoundAddressListAdapter.getFavouriteChangedAddressObservable()
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(mViewModel::addAddress));
     }
 
     @Override
@@ -153,19 +136,15 @@ public class SearchActivity extends AppCompatActivity {
     }
 
     @Override
-    public boolean onSupportNavigateUp(){
-        finish();
-        return true;
+    protected void onStop() {
+        super.onStop();
+        mPlaceSelectedDisposable.dispose();
     }
 
     @Override
-    public void onBackPressed() {
-        if (mSearchView.hasFocus()) {
-            mSearchView.clearFocus();
-            mSearchView.setText("");
-        } else {
-            finish();
-        }
+    public boolean onSupportNavigateUp(){
+        finish();
+        return true;
     }
 
     /**
@@ -223,15 +202,6 @@ public class SearchActivity extends AppCompatActivity {
     }
 
     /**
-     * Shows found addresses.
-     *
-     * @param addresses addresses to show.
-     */
-    private void showFoundAddresses(final List<Address> addresses) {
-        showAddressesByDiff(addresses, mFoundAddressListAdapter);
-    }
-
-    /**
      * Completes search by the certain address.
      *
      * @param address address to complete with.
@@ -262,8 +232,9 @@ public class SearchActivity extends AppCompatActivity {
      * Initiates action bar.
      */
     private void initActionBar() {
+        setSupportActionBar(mToolbar);
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle(R.string.search);
+            getSupportActionBar().setTitle("");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
     }

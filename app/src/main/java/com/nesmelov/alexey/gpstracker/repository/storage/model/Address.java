@@ -4,6 +4,9 @@ import android.arch.persistence.room.Entity;
 import android.arch.persistence.room.PrimaryKey;
 import android.support.annotation.NonNull;
 
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.maps.model.LatLng;
+
 import java.sql.Date;
 
 @Entity
@@ -12,6 +15,7 @@ public class Address {
     @NonNull
     @PrimaryKey
     public String name = "";
+    public String details = "";
     public Boolean favourite;
     public double lat;
     public double lon;
@@ -23,20 +27,15 @@ public class Address {
      * @param geoAddress google address to create entity.
      * @return address instance.
      */
-    public static Address fromGeoAddress(final android.location.Address geoAddress) {
+    public static Address fromGeoAddress(final Place geoAddress) {
         final Address result = new Address();
-        final StringBuilder sb = new StringBuilder();
-        if (geoAddress.getMaxAddressLineIndex() != -1) {
-            for (int i = 0; i < geoAddress.getMaxAddressLineIndex(); i++) {
-                sb.append(geoAddress.getAddressLine(i));
-            }
-            sb.append(geoAddress.getAddressLine(geoAddress.getMaxAddressLineIndex()));
-        }
-        result.name = sb.toString();
+        result.name = geoAddress.getName().toString();
+        result.details = geoAddress.getAddress().toString();
         result.favourite = false;
         result.date = new Date(System.currentTimeMillis());
-        result.lat = geoAddress.getLatitude();
-        result.lon = geoAddress.getLongitude();
+        final LatLng latLng = geoAddress.getLatLng();
+        result.lat = latLng.latitude;
+        result.lon = latLng.longitude;
 
         return result;
     }

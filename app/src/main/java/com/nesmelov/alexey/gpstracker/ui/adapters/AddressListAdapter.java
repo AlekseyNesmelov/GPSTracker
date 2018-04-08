@@ -120,6 +120,7 @@ public class AddressListAdapter extends RecyclerView.Adapter<AddressListAdapter.
         if (holderPos != RecyclerView.NO_POSITION) {
             final Address holderAddress = mAddresses.get(holderPos);
             holder.mNameView.setText(holderAddress.name);
+            holder.mDetailsView.setText(holderAddress.details);
             holder.mFavouriteBtn.setChecked(holderAddress.favourite);
         }
     }
@@ -134,6 +135,7 @@ public class AddressListAdapter extends RecyclerView.Adapter<AddressListAdapter.
      */
     static class AddressViewHolder extends RecyclerView.ViewHolder{
         @BindView(R.id.name) TextView mNameView;
+        @BindView(R.id.details) TextView mDetailsView;
         @BindView(R.id.favourite) ToggleButton mFavouriteBtn;
         @BindView(R.id.main) ConstraintLayout mLayout;
 

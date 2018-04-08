@@ -15,5 +15,5 @@ public class Alarm {
     public double radius;
     public boolean turnedOn;
     public int color;
-    public Date date;
+    public Date date = new Date(0);
 }
