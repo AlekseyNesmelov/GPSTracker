@@ -46,6 +46,7 @@ dependencies {
     implementation 'com.jakewharton:butterknife:8.8.1'
     implementation 'com.google.dagger:dagger-android:2.11'
     implementation 'com.google.dagger:dagger-android-support:2.11'
+    implementation 'com.google.maps.android:android-maps-utils:0.4.1'
     implementation 'com.google.android.gms:play-services-maps:12.0.1'
     implementation 'com.google.android.gms:play-services-places:12.0.1'
     implementation 'com.android.support:design:27.1.0'

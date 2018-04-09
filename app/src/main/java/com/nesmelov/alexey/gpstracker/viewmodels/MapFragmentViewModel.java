@@ -2,7 +2,10 @@ package com.nesmelov.alexey.gpstracker.viewmodels;
 
 import android.arch.lifecycle.MutableLiveData;
 import android.arch.lifecycle.ViewModel;
+import android.databinding.Observable;
 
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.LatLng;
 import com.nesmelov.alexey.gpstracker.application.TrackerApplication;
 import com.nesmelov.alexey.gpstracker.repository.AddressesRepository;
@@ -26,15 +29,16 @@ public class MapFragmentViewModel extends ViewModel {
     public static final int MODE_ALARM_POS = 2;
     public static final int MODE_ALARM_RADIUS = 3;
 
-    @Inject
-    AddressesRepository mAddressesRepository;
+    @Inject AddressesRepository mAddressesRepository;
 
     private MutableLiveData<Boolean> mIsFollowMe;
     private MutableLiveData<LatLng> mCameraPos;
     private MutableLiveData<Integer> mMode;
-
     private MutableLiveData<List<Alarm>> mAlarms;
 
+    /**
+     * Constructs view model for map fragment.
+     */
     public MapFragmentViewModel() {
         TrackerApplication.getAppUtilsComp().inject(this);
     }

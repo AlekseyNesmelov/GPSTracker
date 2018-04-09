@@ -35,7 +35,7 @@ public class MapControlBehavior extends FloatingActionButton.Behavior {
         final float ratio = (float)(parent.getHeight() - dependency.getTop()) / dependency.getHeight();
         final CoordinatorLayout.LayoutParams lp = (CoordinatorLayout.LayoutParams) child.getLayoutParams();
         final int width = child.getWidth() + lp.getMarginEnd();
-        child.setTranslationX(SPEED * ratio * width);
+        child.setTranslationX(Math.max(0, SPEED * ratio * width));
         return true;
     }
 }

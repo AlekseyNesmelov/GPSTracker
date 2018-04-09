@@ -78,10 +78,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @BindView(R.id.alarm_target) ImageView mAlarmTarget;
     @BindView(R.id.radiusSeekBar) SeekBar mRadiusSeekBar;
 
+    private MapFragmentViewModel mViewModel;
+
     private GoogleMap mMap;
     private Circle mAlarmRadius;
-
-    private MapFragmentViewModel mViewModel;
 
     private CompositeDisposable mCompositeDisposable;
     private Observable<View> mFollowMeClickObservable;
@@ -91,6 +91,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private Observable<View> mSearchCardClickObservable;
     private Observable<View> mAddAlarmBtnClickObservable;
     private Observable<View> mOkBtnClickObservable;
+    private Observable<Double> mRadiusChangedObservable;
+    private Observable<Integer> mBottomSheetStateChangedObservable;
 
     private HorizontalAlarmAdapter mHorizontalAlarmAdapter;
 
@@ -123,7 +125,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public void onDestroyView() {
         mViewModel = null;
-        mMap = null;
         super.onDestroyView();
     }
 
@@ -134,41 +135,37 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         initViewModel();
         initClickObservables();
 
-        final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
-        bottomSheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
-            @Override
-            public void onStateChanged(@NonNull View bottomSheet, int newState) {
-                if (newState == BottomSheetBehavior.STATE_COLLAPSED) {
-                    mViewModel.menuClosed();
-                } else if (newState == BottomSheetBehavior.STATE_EXPANDED) {
-                    mViewModel.menuOpened();
+        mBottomSheetStateChangedObservable = Observable.create(e -> {
+            final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
+            e.setCancellable(() -> bottomSheetBehavior.setBottomSheetCallback(null));
+            bottomSheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+                @Override
+                public void onStateChanged(@NonNull final View bottomSheet, final int newState) {
+                    e.onNext(newState);
                 }
-            }
 
-            @Override
-            public void onSlide(@NonNull View bottomSheet, float slideOffset) {
-            }
+                @Override
+                public void onSlide(@NonNull View bottomSheet, float slideOffset) {
+                }
+            });
         });
 
-        mRadiusSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser) {
-                final float radius = progress + 10;
-                if (mAlarmRadius != null) {
-                    mAlarmRadius.setRadius(radius);
+        mRadiusChangedObservable = Observable.create(e -> {
+            e.setCancellable(() -> mRadiusSeekBar.setOnSeekBarChangeListener(null));
+            mRadiusSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override
+                public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser) {
+                    e.onNext((double)(progress + 10));
                 }
-                if (mAlarmRadius != null) {
-                    mMapUtils.animateCameraTo(mMap, mAlarmRadius);
+
+                @Override
+                public void onStartTrackingTouch(final SeekBar seekBar) {
                 }
-            }
 
-            @Override
-            public void onStartTrackingTouch(final SeekBar seekBar) {
-            }
-
-            @Override
-            public void onStopTrackingTouch(final SeekBar seekBar) {
-            }
+                @Override
+                public void onStopTrackingTouch(final SeekBar seekBar) {
+                }
+            });
         });
     }
 
@@ -389,6 +386,21 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         showAlarmsByDiff(alarms, mHorizontalAlarmAdapter);
     }
 
+    private void radiusChanged(final double radius) {
+        if (mAlarmRadius != null) {
+            mAlarmRadius.setRadius(radius);
+            mMapUtils.animateCameraTo(mMap, mAlarmRadius);
+        }
+    }
+
+    private void bottomSheetStateChangred(final int newState) {
+        if (newState == BottomSheetBehavior.STATE_COLLAPSED) {
+            mViewModel.menuClosed();
+        } else if (newState == BottomSheetBehavior.STATE_EXPANDED) {
+            mViewModel.menuOpened();
+        }
+    }
+
     private void showAlarmsByDiff(final List<Alarm> alarms, final HorizontalAlarmAdapter adapter) {
         final AlarmDiffUtilsCallback diffUtilCallback = new AlarmDiffUtilsCallback(
                 adapter.getData(), alarms);
@@ -453,6 +465,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         mCompositeDisposable.add(mZoomOutClickObservable.subscribe(v -> mMapUtils.zoomOut(mMap)));
         mCompositeDisposable.add(mSearchCardClickObservable.subscribe(v -> startActivityForResult(
                 new Intent(getContext(), SearchActivity.class), REQUEST_CODE_SEARCH_PLACE)));
+        mCompositeDisposable.add(mBottomSheetStateChangedObservable.subscribe(this::bottomSheetStateChangred));
+        mCompositeDisposable.add(mRadiusChangedObservable.subscribe(this::radiusChanged));
     }
 
     /**
