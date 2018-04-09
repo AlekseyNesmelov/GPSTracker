@@ -25,9 +25,6 @@ import butterknife.ButterKnife;
 import io.reactivex.Observable;
 import io.reactivex.ObservableEmitter;
 
-import static android.support.v7.widget.helper.ItemTouchHelper.LEFT;
-import static android.support.v7.widget.helper.ItemTouchHelper.RIGHT;
-
 /**
  * Fragment that shows addresses list.
  */
@@ -75,7 +72,7 @@ public class AddressesFragment extends Fragment {
             final ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.Callback() {
                 @Override
                 public int getMovementFlags(final RecyclerView recyclerView, final RecyclerView.ViewHolder viewHolder) {
-                    return  makeMovementFlags(0, LEFT);
+                    return  makeMovementFlags(0, ItemTouchHelper.LEFT);
                 }
 
                 @Override

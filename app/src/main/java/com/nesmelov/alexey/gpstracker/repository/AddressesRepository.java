@@ -6,14 +6,12 @@ import com.nesmelov.alexey.gpstracker.repository.storage.AppDatabase;
 import com.nesmelov.alexey.gpstracker.repository.storage.model.Address;
 import com.nesmelov.alexey.gpstracker.repository.storage.model.Alarm;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import javax.inject.Inject;
 
 import io.reactivex.Completable;
 import io.reactivex.Flowable;
-import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.schedulers.Schedulers;
 
@@ -22,14 +20,10 @@ import io.reactivex.schedulers.Schedulers;
  */
 public class AddressesRepository implements IAddressesRepository {
 
-    private static final int MAX_SEARCH_RESULTS = 10;
-
-    private Geocoder mGeocoder;
     private AppDatabase mDatabase;
 
     @Inject
-    public AddressesRepository(final Geocoder geocoder, final AppDatabase database) {
-        mGeocoder = geocoder;
+    public AddressesRepository(final AppDatabase database) {
         mDatabase = database;
     }
 

@@ -26,8 +26,6 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.SeekBar;
 
-import com.google.android.gms.maps.CameraUpdate;
-import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -131,28 +129,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
     @Override
     public void onViewCreated(@NonNull final View view, @Nullable final Bundle savedInstanceState) {
-        mAlarmTarget.bringToFront();
-        mRadiusSeekBar.bringToFront();
-        mOkBtn.bringToFront();
-        mBottomSheet.bringToFront();
-
-        mHorizontalAlarmAdapter = new HorizontalAlarmAdapter();
-        mAlarmsView.setLayoutManager(new LinearLayoutManager(getActivity(),
-                LinearLayoutManager.HORIZONTAL, false));
-        mAlarmsView.setAdapter(mHorizontalAlarmAdapter);
-
-        mViewModel = ViewModelProviders.of(this).get(MapFragmentViewModel.class);
-        mViewModel.getFollowMeState().observe(this, this::updateFollowMeState);
-        mViewModel.getAlarms().observe(this, this::showAlarms);
-        mViewModel.getMode().observe(this, this::modeChanged);
-
-        mFollowMeClickObservable = createClickObservable(mFollowMeBtn);
-        mMenuClickObservable = createClickObservable(mMenuFab);
-        mZoomInClickObservable = createClickObservable(mZoomInBtn);
-        mZoomOutClickObservable = createClickObservable(mZoomOutBtn);
-        mSearchCardClickObservable = createClickObservable(mSearchCard);
-        mAddAlarmBtnClickObservable = createClickObservable(mAddAlarmBtn);
-        mOkBtnClickObservable = createClickObservable(mOkBtn);
+        bringViewsToFront();
+        initHorizontalAlarmAdapter();
+        initViewModel();
+        initClickObservables();
 
         final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
         bottomSheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
@@ -178,8 +158,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                     mAlarmRadius.setRadius(radius);
                 }
                 if (mAlarmRadius != null) {
-                    mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(
-                            mAlarmRadius.getCenter(), mMapUtils.getZoomLevel(mAlarmRadius)));
+                    mMapUtils.animateCameraTo(mMap, mAlarmRadius);
                 }
             }
 
@@ -199,15 +178,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         mMapView.onResume();
         mMapView.getMapAsync(this);
 
-        mCompositeDisposable = new CompositeDisposable();
-        mCompositeDisposable.add(mOkBtnClickObservable.subscribe(v -> mViewModel.clickOk()));
-        mCompositeDisposable.add(mMenuClickObservable.subscribe(v-> mViewModel.clickMenu()));
-        mCompositeDisposable.add(mFollowMeClickObservable.subscribe(v -> mViewModel.clickFollowMe()));
-        mCompositeDisposable.add(mAddAlarmBtnClickObservable.subscribe(v -> mViewModel.clickAddAlarm()));
-        mCompositeDisposable.add(mZoomInClickObservable.subscribe(v -> mMapUtils.zoomIn(mMap)));
-        mCompositeDisposable.add(mZoomOutClickObservable.subscribe(v -> mMapUtils.zoomOut(mMap)));
-        mCompositeDisposable.add(mSearchCardClickObservable.subscribe(v -> startActivityForResult(
-                new Intent(getContext(), SearchActivity.class), REQUEST_CODE_SEARCH_PLACE)));
+        subscribeClickObservables();
     }
 
     @Override
@@ -216,9 +187,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         if (mMap != null) {
             mViewModel.getCameraPos().setValue(mMap.getCameraPosition().target);
         }
-
         mMapView.onPause();
-        mCompositeDisposable.dispose();
+        unsubscribeClickObservables();
     }
 
     @Override
@@ -297,81 +267,125 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    /**
+     * Handle mode changed event. The modes are following:
+     * 0 - menu is closed,
+     * 1 - menu is opened,
+     * 2 - alarm position selecting,
+     * 3 - alarm radius selecting.
+     *
+     * @param mode mode to select.
+     */
     private void modeChanged(final int mode) {
-        if (getActivity() != null) {
-            final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
-
-            switch (mode) {
-                case MapFragmentViewModel.MODE_MENU_CLOSED:
-                    if (mAlarmRadius != null) {
-                        mAlarmRadius.setVisible(false);
-                    }
-                    mAlarmTarget.setVisibility(View.GONE);
-                    mRadiusSeekBar.setVisibility(View.GONE);
-                    if (mOkBtn.getVisibility() == View.VISIBLE) {
-                        mOkBtn.hide();
-                    }
-                    bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
-                    mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_reorder_black_24dp));
-                    break;
-                case MapFragmentViewModel.MODE_MENU_OPENED:
-                    if (mAlarmRadius != null) {
-                        mAlarmRadius.setVisible(false);
-                    }
-                    mAlarmTarget.setVisibility(View.GONE);
-                    mRadiusSeekBar.setVisibility(View.GONE);
-                    if (mOkBtn.getVisibility() == View.VISIBLE) {
-                        mOkBtn.hide();
-                    }
-                    bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-                    mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_close_black_24dp));
-                    break;
-                case MapFragmentViewModel.MODE_ALARM_POS:
-                    if (mAlarmRadius != null) {
-                        mAlarmRadius.setVisible(false);
-                    }
-                    mRadiusSeekBar.setVisibility(View.GONE);
-                    mAlarmTarget.setVisibility(View.VISIBLE);
-                    if (mOkBtn.getVisibility() != View.VISIBLE) {
-                        mOkBtn.show();
-                    }
-                    bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
-                    mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_close_black_24dp));
-                    break;
-                case MapFragmentViewModel.MODE_ALARM_RADIUS:
-                    if (mMap != null) {
-                        mAlarmRadius = mMap.addCircle(new CircleOptions()
-                                .center(mMap.getCameraPosition().target)
-                                .visible(true)
-                                .fillColor(Color.argb(128, 255, 152, 0))
-                                .strokeColor(Color.argb(128, 230, 81, 0))
-                                .strokeWidth(7)
-                                .radius(1000)
-                        );
-                        final LatLng latLng = mMap.getCameraPosition().target;
-                        final CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng,
-                                mMapUtils.getZoomLevel(mAlarmRadius));
-                        mMap.animateCamera(cameraUpdate);
-                    }
-
-                    mRadiusSeekBar.setVisibility(View.VISIBLE);
-                    mAlarmTarget.setVisibility(View.GONE);
-                    if (mOkBtn.getVisibility() != View.VISIBLE) {
-                        mOkBtn.show();
-                    }
-                    bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
-                    mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_close_black_24dp));
-                    break;
-                default:
-                    break;
-            }
+        switch (mode) {
+            case MapFragmentViewModel.MODE_MENU_CLOSED:
+                setMenuClosedMode();
+                break;
+            case MapFragmentViewModel.MODE_MENU_OPENED:
+                setMenuOpenedMode();
+                break;
+            case MapFragmentViewModel.MODE_ALARM_POS:
+                setAlarmPosMode();
+                break;
+            case MapFragmentViewModel.MODE_ALARM_RADIUS:
+                setAlarmRadiusMode();
+                break;
+            default:
+                break;
         }
     }
 
-    private void
+    /**
+     * Sets menu closed mode.
+     */
+    private void setMenuClosedMode() {
+        if (mAlarmRadius != null) {
+            mAlarmRadius.setVisible(false);
+        }
+        mAlarmTarget.setVisibility(View.GONE);
+        mRadiusSeekBar.setVisibility(View.GONE);
+        if (mOkBtn.getVisibility() == View.VISIBLE) {
+            mOkBtn.hide();
+        }
+        final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
+        bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+        if (getActivity() != null) {
+            mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_reorder_black_24dp));
+        }
+    }
 
+    /**
+     * Sets menu opened mode.
+     */
+    private void setMenuOpenedMode() {
+        if (mAlarmRadius != null) {
+            mAlarmRadius.setVisible(false);
+        }
+        mAlarmTarget.setVisibility(View.GONE);
+        mRadiusSeekBar.setVisibility(View.GONE);
+        if (mOkBtn.getVisibility() == View.VISIBLE) {
+            mOkBtn.hide();
+        }
+        final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
+        bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+        if (getActivity() != null) {
+            mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_close_black_24dp));
+        }
+    }
 
-    showAlarms(final List<Alarm> alarms) {
+    /**
+     * Sets alarm position mode.
+     */
+    private void setAlarmPosMode() {
+        if (mAlarmRadius != null) {
+            mAlarmRadius.setVisible(false);
+        }
+        mRadiusSeekBar.setVisibility(View.GONE);
+        mAlarmTarget.setVisibility(View.VISIBLE);
+        if (mOkBtn.getVisibility() != View.VISIBLE) {
+            mOkBtn.show();
+        }
+        final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
+        bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+        if (getActivity() != null) {
+            mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_close_black_24dp));
+        }
+    }
+
+    /**
+     * Sets alarm radius mode.
+     */
+    private void setAlarmRadiusMode() {
+        if (mMap != null) {
+            mAlarmRadius = mMap.addCircle(new CircleOptions()
+                    .center(mMap.getCameraPosition().target)
+                    .visible(true)
+                    .fillColor(Color.argb(128, 255, 152, 0))
+                    .strokeColor(Color.argb(128, 230, 81, 0))
+                    .strokeWidth(7)
+                    .radius(1000)
+            );
+            mMapUtils.animateCameraTo(mMap, mAlarmRadius);
+        }
+
+        mRadiusSeekBar.setVisibility(View.VISIBLE);
+        mAlarmTarget.setVisibility(View.GONE);
+        if (mOkBtn.getVisibility() != View.VISIBLE) {
+            mOkBtn.show();
+        }
+        final BottomSheetBehavior bottomSheetBehavior = BottomSheetBehavior.from(mBottomSheet);
+        bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+        if (getActivity() != null) {
+            mMenuFab.setImageDrawable(ContextCompat.getDrawable(getActivity(), R.drawable.ic_close_black_24dp));
+        }
+    }
+
+    /**
+     * Show list of alarms.
+     *
+     * @param alarms alarms to show.
+     */
+    private void showAlarms(final List<Alarm> alarms) {
         showAlarmsByDiff(alarms, mHorizontalAlarmAdapter);
     }
 
@@ -381,5 +395,70 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         final DiffUtil.DiffResult diffResult = DiffUtil.calculateDiff(diffUtilCallback);
         adapter.setData(alarms);
         diffResult.dispatchUpdatesTo(adapter);
+    }
+
+    /**
+     * Brings views to the front.
+     */
+    private void bringViewsToFront() {
+        mAlarmTarget.bringToFront();
+        mRadiusSeekBar.bringToFront();
+        mOkBtn.bringToFront();
+        mBottomSheet.bringToFront();
+    }
+
+    /**
+     * Initiates horizontal alarms adapter.
+     */
+    private void initHorizontalAlarmAdapter() {
+        mHorizontalAlarmAdapter = new HorizontalAlarmAdapter();
+        mAlarmsView.setLayoutManager(new LinearLayoutManager(getActivity(),
+                LinearLayoutManager.HORIZONTAL, false));
+        mAlarmsView.setAdapter(mHorizontalAlarmAdapter);
+    }
+
+    /**
+     * Initiates view model.
+     */
+    private void initViewModel() {
+        mViewModel = ViewModelProviders.of(this).get(MapFragmentViewModel.class);
+        mViewModel.getFollowMeState().observe(this, this::updateFollowMeState);
+        mViewModel.getAlarms().observe(this, this::showAlarms);
+        mViewModel.getMode().observe(this, this::modeChanged);
+    }
+
+    /**
+     * Initiates click observables.
+     */
+    private void initClickObservables() {
+        mFollowMeClickObservable = createClickObservable(mFollowMeBtn);
+        mMenuClickObservable = createClickObservable(mMenuFab);
+        mZoomInClickObservable = createClickObservable(mZoomInBtn);
+        mZoomOutClickObservable = createClickObservable(mZoomOutBtn);
+        mSearchCardClickObservable = createClickObservable(mSearchCard);
+        mAddAlarmBtnClickObservable = createClickObservable(mAddAlarmBtn);
+        mOkBtnClickObservable = createClickObservable(mOkBtn);
+    }
+
+    /**
+     * Subscribes to click observables.
+     */
+    private void subscribeClickObservables() {
+        mCompositeDisposable = new CompositeDisposable();
+        mCompositeDisposable.add(mOkBtnClickObservable.subscribe(v -> mViewModel.clickOk()));
+        mCompositeDisposable.add(mMenuClickObservable.subscribe(v-> mViewModel.clickMenu()));
+        mCompositeDisposable.add(mFollowMeClickObservable.subscribe(v -> mViewModel.clickFollowMe()));
+        mCompositeDisposable.add(mAddAlarmBtnClickObservable.subscribe(v -> mViewModel.clickAddAlarm()));
+        mCompositeDisposable.add(mZoomInClickObservable.subscribe(v -> mMapUtils.zoomIn(mMap)));
+        mCompositeDisposable.add(mZoomOutClickObservable.subscribe(v -> mMapUtils.zoomOut(mMap)));
+        mCompositeDisposable.add(mSearchCardClickObservable.subscribe(v -> startActivityForResult(
+                new Intent(getContext(), SearchActivity.class), REQUEST_CODE_SEARCH_PLACE)));
+    }
+
+    /**
+     * Unsubscribes from click observables.
+     */
+    private void unsubscribeClickObservables() {
+        mCompositeDisposable.dispose();
     }
 }

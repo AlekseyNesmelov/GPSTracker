@@ -8,21 +8,30 @@ import android.view.View;
 
 import com.nesmelov.alexey.gpstracker.R;
 
+/**
+ * Map controls adapter. The map controls should be hidden when bottom sheet is opened.
+ */
 public class MapControlBehavior extends FloatingActionButton.Behavior {
 
     private static final int SPEED = 2;
 
-    public MapControlBehavior(Context context, AttributeSet attrs) {
+    /**
+     * Constructs map controls behaviour.
+     *
+     * @param context context to use.
+     * @param attrs attribute set to use.
+     */
+    public MapControlBehavior(final Context context, final AttributeSet attrs) {
         super(context, attrs);
     }
 
     @Override
-    public boolean layoutDependsOn(CoordinatorLayout parent, FloatingActionButton child, View dependency) {
+    public boolean layoutDependsOn(final CoordinatorLayout parent, final FloatingActionButton child, final View dependency) {
         return dependency.getId() == R.id.bottom_sheet;
     }
 
     @Override
-    public boolean onDependentViewChanged(CoordinatorLayout parent, FloatingActionButton child, View dependency) {
+    public boolean onDependentViewChanged(final CoordinatorLayout parent, final FloatingActionButton child, final View dependency) {
         final float ratio = (float)(parent.getHeight() - dependency.getTop()) / dependency.getHeight();
         final CoordinatorLayout.LayoutParams lp = (CoordinatorLayout.LayoutParams) child.getLayoutParams();
         final int width = child.getWidth() + lp.getMarginEnd();

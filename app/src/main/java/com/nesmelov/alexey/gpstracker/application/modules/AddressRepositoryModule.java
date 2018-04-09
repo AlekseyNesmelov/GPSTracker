@@ -1,7 +1,5 @@
 package com.nesmelov.alexey.gpstracker.application.modules;
 
-import android.location.Geocoder;
-
 import com.nesmelov.alexey.gpstracker.repository.storage.AppDatabase;
 import com.nesmelov.alexey.gpstracker.repository.AddressesRepository;
 import com.nesmelov.alexey.gpstracker.repository.IAddressesRepository;
@@ -16,7 +14,7 @@ public class AddressRepositoryModule {
 
     @Provides
     @Singleton
-    IAddressesRepository provideAddressRepository(final Geocoder geocoder, final AppDatabase database) {
-        return new AddressesRepository(geocoder, database);
+    IAddressesRepository provideAddressRepository(final AppDatabase database) {
+        return new AddressesRepository(database);
     }
 }

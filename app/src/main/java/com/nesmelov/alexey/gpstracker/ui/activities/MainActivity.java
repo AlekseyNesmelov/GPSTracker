@@ -59,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
         setupViewPager(mViewPager);
         mBottomNavigationView.setOnNavigationItemSelectedListener(this::selectFragment);
 
-        if ( Build.VERSION.SDK_INT > 24 && ContextCompat.checkSelfPermission(MainActivity.this,
+        if ( Build.VERSION.SDK_INT >= 23 && ContextCompat.checkSelfPermission(MainActivity.this,
                 android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(
                     this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_REQUEST_CODE);

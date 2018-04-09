@@ -22,18 +22,18 @@ public class Address {
     public Date date;
 
     /**
-     * Creates instance by google address.
+     * Creates instance by google place.
      *
-     * @param geoAddress google address to create entity.
+     * @param place google place to create entity.
      * @return address instance.
      */
-    public static Address fromGeoAddress(final Place geoAddress) {
+    public static Address fromGeoAddress(final Place place) {
         final Address result = new Address();
-        result.name = geoAddress.getName().toString();
-        result.details = geoAddress.getAddress().toString();
+        result.name = place.getName().toString();
+        result.details = place.getAddress().toString();
         result.favourite = false;
         result.date = new Date(System.currentTimeMillis());
-        final LatLng latLng = geoAddress.getLatLng();
+        final LatLng latLng = place.getLatLng();
         result.lat = latLng.latitude;
         result.lon = latLng.longitude;
 

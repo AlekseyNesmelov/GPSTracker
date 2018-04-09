@@ -7,6 +7,8 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.maps.android.SphericalUtil;
 
 import javax.inject.Inject;
 
@@ -105,6 +107,21 @@ public class MapUtils {
     }
 
     /**
+     * Animates camera to the circle bounding box.
+     *
+     * @param map google map.
+     * @param circle circle to animate camera to.
+     */
+    public void animateCameraTo(final GoogleMap map, final Circle circle) {
+        final LatLng targetNorthEast = SphericalUtil.computeOffset(circle.getCenter(), circle.getRadius() * Math.sqrt(2), 45);
+        final LatLng targetSouthWest = SphericalUtil.computeOffset(circle.getCenter(), circle.getRadius() * Math.sqrt(2), 225);
+        if (map != null) {
+            final CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngBounds(new LatLngBounds(targetSouthWest, targetNorthEast), 0);
+            map.animateCamera(cameraUpdate);
+        }
+    }
+
+    /**
      * Zooming in.
      *
      * @param map google map.
@@ -130,21 +147,5 @@ public class MapUtils {
                 updateZoom(map, cameraZoom - 1);
             }
         }
-    }
-
-    /**
-     * Gets zoom level for current circle.
-     *
-     * @param circle circle to calculate zoom.
-     * @return zoom level for current circle.
-     */
-    public float getZoomLevel(final Circle circle) {
-        float zoomLevel = 11;
-        if (circle != null) {
-            double radius = circle.getRadius() + circle.getRadius() / 2;
-            double scale = radius / 300;
-            zoomLevel = (float) (16 - Math.log(scale) / Math.log(2));
-        }
-        return zoomLevel;
     }
 }

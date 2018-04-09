@@ -2,7 +2,6 @@ package com.nesmelov.alexey.gpstracker.ui.utils;
 
 import android.support.v7.util.DiffUtil;
 
-import com.nesmelov.alexey.gpstracker.repository.storage.model.Address;
 import com.nesmelov.alexey.gpstracker.repository.storage.model.Alarm;
 
 import java.util.List;
@@ -47,8 +46,7 @@ public class AlarmDiffUtilsCallback extends DiffUtil.Callback {
     public boolean areContentsTheSame(final int oldItemPosition, final int newItemPosition) {
         final Alarm oldAddress = mOldList.get(oldItemPosition);
         final Alarm newAddress = mNewList.get(newItemPosition);
-        return (oldAddress.name == null && newAddress.name == null
-                || oldAddress.name != null && oldAddress.name.equals(newAddress.name))
+        return (oldAddress.name.equals(newAddress.name))
                 && (oldAddress.date == null && newAddress.date == null
                 || oldAddress.date != null && oldAddress.date.equals(newAddress.date))
                 && oldAddress.id == newAddress.id
