@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.arch.lifecycle.ViewModelProviders;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.databinding.DataBindingUtil;
 import android.graphics.Color;
 import android.location.Location;
 import android.os.Bundle;
@@ -37,6 +38,7 @@ import com.nesmelov.alexey.gpstracker.application.TrackerApplication;
 import com.nesmelov.alexey.gpstracker.application.utils.LocationUtils;
 import com.nesmelov.alexey.gpstracker.application.utils.MapUtils;
 import com.nesmelov.alexey.gpstracker.application.utils.Position;
+import com.nesmelov.alexey.gpstracker.databinding.LayoutMapBinding;
 import com.nesmelov.alexey.gpstracker.repository.storage.model.Alarm;
 import com.nesmelov.alexey.gpstracker.ui.activities.SearchActivity;
 import com.nesmelov.alexey.gpstracker.ui.adapters.HorizontalAlarmAdapter;
@@ -84,13 +86,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private Circle mAlarmRadius;
 
     private CompositeDisposable mCompositeDisposable;
-    private Observable<View> mFollowMeClickObservable;
-    private Observable<View> mMenuClickObservable;
     private Observable<View> mZoomInClickObservable;
     private Observable<View> mZoomOutClickObservable;
     private Observable<View> mSearchCardClickObservable;
     private Observable<View> mAddAlarmBtnClickObservable;
-    private Observable<View> mOkBtnClickObservable;
     private Observable<Double> mRadiusChangedObservable;
     private Observable<Integer> mBottomSheetStateChangedObservable;
 
@@ -116,7 +115,14 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public View onCreateView(@NonNull final LayoutInflater inflater,
                              @Nullable final ViewGroup container, final @Nullable Bundle savedInstanceState) {
-        final View view =  inflater.inflate(R.layout.layout_map, container, false);
+        mViewModel = ViewModelProviders.of(this).get(MapFragmentViewModel.class);
+        mViewModel.mIsFollowMe.observe(this, this::updateFollowMeState);
+        mViewModel.getAlarms().observe(this, this::showAlarms);
+        mViewModel.getMode().observe(this, this::modeChanged);
+
+        final LayoutMapBinding binding = DataBindingUtil.inflate(inflater, R.layout.layout_map, container, false);
+        binding.setViewModel(mViewModel);
+        final View view = binding.getRoot();
         ButterKnife.bind(this, view);
         mMapView.onCreate(savedInstanceState);
         return view;
@@ -132,7 +138,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     public void onViewCreated(@NonNull final View view, @Nullable final Bundle savedInstanceState) {
         bringViewsToFront();
         initHorizontalAlarmAdapter();
-        initViewModel();
         initClickObservables();
 
         mBottomSheetStateChangedObservable = Observable.create(e -> {
@@ -216,7 +221,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         }
         mMap.setOnCameraMoveStartedListener(reason -> {
             if (reason == GoogleMap.OnCameraMoveStartedListener.REASON_GESTURE) {
-                mViewModel.getFollowMeState().setValue(false);
+                mViewModel.mIsFollowMe.setValue(false);
             }
         });
     }
@@ -258,10 +263,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                 mMapUtils.animateCameraTo(mMap, myPos.getLatitude(), myPos.getLongitude());
             }
         }
-        if (getActivity() != null) {
+        /*if (getActivity() != null) {
             mFollowMeBtn.setImageDrawable(ContextCompat.getDrawable(getActivity(),
                     followMe ? R.drawable.ic_near_me_black_24dp : R.drawable.ic_my_location_off_black_48dp));
-        }
+        }*/
     }
 
     /**
@@ -434,7 +439,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
      */
     private void initViewModel() {
         mViewModel = ViewModelProviders.of(this).get(MapFragmentViewModel.class);
-        mViewModel.getFollowMeState().observe(this, this::updateFollowMeState);
+        // mViewModel.getFollowMeState().observe(this, this::updateFollowMeState);
         mViewModel.getAlarms().observe(this, this::showAlarms);
         mViewModel.getMode().observe(this, this::modeChanged);
     }
@@ -443,13 +448,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
      * Initiates click observables.
      */
     private void initClickObservables() {
-        mFollowMeClickObservable = createClickObservable(mFollowMeBtn);
-        mMenuClickObservable = createClickObservable(mMenuFab);
         mZoomInClickObservable = createClickObservable(mZoomInBtn);
         mZoomOutClickObservable = createClickObservable(mZoomOutBtn);
         mSearchCardClickObservable = createClickObservable(mSearchCard);
         mAddAlarmBtnClickObservable = createClickObservable(mAddAlarmBtn);
-        mOkBtnClickObservable = createClickObservable(mOkBtn);
     }
 
     /**
@@ -457,9 +459,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
      */
     private void subscribeClickObservables() {
         mCompositeDisposable = new CompositeDisposable();
-        mCompositeDisposable.add(mOkBtnClickObservable.subscribe(v -> mViewModel.clickOk()));
-        mCompositeDisposable.add(mMenuClickObservable.subscribe(v-> mViewModel.clickMenu()));
-        mCompositeDisposable.add(mFollowMeClickObservable.subscribe(v -> mViewModel.clickFollowMe()));
         mCompositeDisposable.add(mAddAlarmBtnClickObservable.subscribe(v -> mViewModel.clickAddAlarm()));
         mCompositeDisposable.add(mZoomInClickObservable.subscribe(v -> mMapUtils.zoomIn(mMap)));
         mCompositeDisposable.add(mZoomOutClickObservable.subscribe(v -> mMapUtils.zoomOut(mMap)));

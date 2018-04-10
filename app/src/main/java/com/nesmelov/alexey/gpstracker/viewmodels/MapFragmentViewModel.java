@@ -2,7 +2,9 @@ package com.nesmelov.alexey.gpstracker.viewmodels;
 
 import android.arch.lifecycle.MutableLiveData;
 import android.arch.lifecycle.ViewModel;
+import android.databinding.Bindable;
 import android.databinding.Observable;
+import android.view.View;
 
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.Circle;
@@ -31,7 +33,7 @@ public class MapFragmentViewModel extends ViewModel {
 
     @Inject AddressesRepository mAddressesRepository;
 
-    private MutableLiveData<Boolean> mIsFollowMe;
+    public MutableLiveData<Boolean> mIsFollowMe = new MutableLiveData<>();
     private MutableLiveData<LatLng> mCameraPos;
     private MutableLiveData<Integer> mMode;
     private MutableLiveData<List<Alarm>> mAlarms;
@@ -71,12 +73,12 @@ public class MapFragmentViewModel extends ViewModel {
      *
      * @return live data for follow me state.
      */
-    public MutableLiveData<Boolean> getFollowMeState() {
+    /*public MutableLiveData<Boolean> getFollowMeState() {
         if (mIsFollowMe == null) {
             mIsFollowMe = new MutableLiveData<>();
         }
         return mIsFollowMe;
-    }
+    }*/
 
     public MutableLiveData<Integer> getMode() {
         if (mMode == null) {
@@ -103,7 +105,7 @@ public class MapFragmentViewModel extends ViewModel {
     /**
      * Click menu event.
      */
-    public void clickMenu() {
+    public void clickMenu(final View view) {
         final Integer mode = getMode().getValue();
         if (mode != null) {
             switch (mode) {
@@ -123,7 +125,7 @@ public class MapFragmentViewModel extends ViewModel {
         }
     }
 
-    public void clickOk() {
+    public void clickOk(final View view) {
         final Integer mode = getMode().getValue();
         if (mode != null) {
             switch (mode) {
@@ -144,9 +146,9 @@ public class MapFragmentViewModel extends ViewModel {
     /**
      * Click follow me event.
      */
-    public void clickFollowMe() {
-        final Boolean prevState = getFollowMeState().getValue();
-        getFollowMeState().setValue(prevState == null || !prevState);
+    public void clickFollowMe(final View view) {
+        final Boolean prevState = mIsFollowMe.getValue();
+        mIsFollowMe.setValue(prevState == null || !prevState);
     }
 
     public void clickAddAlarm() {
