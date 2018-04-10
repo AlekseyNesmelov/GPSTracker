@@ -78,6 +78,14 @@ public class MapUtils {
         }
     }
 
+    public void moveCameraTo(final GoogleMap map, final double lat, final double lon) {
+        if (map != null) {
+            final LatLng latLng = new LatLng(lat, lon);
+            final CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLng(latLng);
+            map.moveCamera(cameraUpdate);
+        }
+    }
+
     /**
      * Updates zoom level.
      *

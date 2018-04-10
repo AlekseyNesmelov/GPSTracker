@@ -1,20 +1,15 @@
 package com.nesmelov.alexey.gpstracker.ui.fragments;
 
-import android.Manifest;
 import android.app.Activity;
 import android.arch.lifecycle.ViewModelProviders;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.databinding.DataBindingUtil;
-import android.graphics.Color;
-import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.constraint.ConstraintLayout;
 import android.support.design.widget.BottomSheetBehavior;
 import android.support.design.widget.FloatingActionButton;
-import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.util.DiffUtil;
@@ -30,13 +25,7 @@ import android.widget.SeekBar;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.model.Circle;
-import com.google.android.gms.maps.model.CircleOptions;
-import com.google.android.gms.maps.model.LatLng;
 import com.nesmelov.alexey.gpstracker.R;
-import com.nesmelov.alexey.gpstracker.application.TrackerApplication;
-import com.nesmelov.alexey.gpstracker.application.utils.LocationUtils;
-import com.nesmelov.alexey.gpstracker.application.utils.MapUtils;
 import com.nesmelov.alexey.gpstracker.application.utils.Position;
 import com.nesmelov.alexey.gpstracker.databinding.LayoutMapBinding;
 import com.nesmelov.alexey.gpstracker.repository.storage.model.Alarm;
@@ -46,8 +35,6 @@ import com.nesmelov.alexey.gpstracker.ui.utils.AlarmDiffUtilsCallback;
 import com.nesmelov.alexey.gpstracker.viewmodels.MapFragmentViewModel;
 
 import java.util.List;
-
-import javax.inject.Inject;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -64,9 +51,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
     private static final int REQUEST_CODE_SEARCH_PLACE = 0;
 
-    @Inject MapUtils mMapUtils;
-    @Inject LocationUtils mLocationUtils;
-
     @BindView(R.id.mapView) MapView mMapView;
     @BindView(R.id.menuBtn) FloatingActionButton mMenuFab;
     @BindView(R.id.followMeBtn) FloatingActionButton mFollowMeBtn;
@@ -82,12 +66,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
     private MapFragmentViewModel mViewModel;
 
-    private GoogleMap mMap;
-    private Circle mAlarmRadius;
-
     private CompositeDisposable mCompositeDisposable;
-    private Observable<View> mZoomInClickObservable;
-    private Observable<View> mZoomOutClickObservable;
     private Observable<View> mSearchCardClickObservable;
     private Observable<View> mAddAlarmBtnClickObservable;
     private Observable<Double> mRadiusChangedObservable;
@@ -104,23 +83,17 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
         return new MapFragment();
     }
 
-    @Override
-    public void onCreate(@Nullable final Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        TrackerApplication.getMapUtilsComp().inject(this);
-        TrackerApplication.getLocationUtilsComp().inject(this);
-    }
-
     @Nullable
     @Override
     public View onCreateView(@NonNull final LayoutInflater inflater,
                              @Nullable final ViewGroup container, final @Nullable Bundle savedInstanceState) {
         mViewModel = ViewModelProviders.of(this).get(MapFragmentViewModel.class);
-        mViewModel.mIsFollowMe.observe(this, this::updateFollowMeState);
+        mViewModel.getFollowMeState().observe(this, this::updateFollowMeState);
         mViewModel.getAlarms().observe(this, this::showAlarms);
         mViewModel.getMode().observe(this, this::modeChanged);
 
         final LayoutMapBinding binding = DataBindingUtil.inflate(inflater, R.layout.layout_map, container, false);
+        binding.setLifecycleOwner(this);
         binding.setViewModel(mViewModel);
         final View view = binding.getRoot();
         ButterKnife.bind(this, view);
@@ -186,9 +159,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public void onPause() {
         super.onPause();
-        if (mMap != null) {
-            mViewModel.getCameraPos().setValue(mMap.getCameraPosition().target);
-        }
         mMapView.onPause();
         unsubscribeClickObservables();
     }
@@ -207,23 +177,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
 
     @Override
     public void onMapReady(final GoogleMap googleMap) {
-        mMap = googleMap;
-        mMap.getUiSettings().setMyLocationButtonEnabled(false);
-        if (getActivity() != null && ActivityCompat.checkSelfPermission(
-                getActivity(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            mMap.setMyLocationEnabled(true);
-            final LatLng location = mViewModel.getCameraPos().getValue();
-            if (location == null) {
-                mMapUtils.initMap(mMap);
-            } else {
-                mMapUtils.animateCameraTo(mMap, location.latitude, location.longitude);
-            }
-        }
-        mMap.setOnCameraMoveStartedListener(reason -> {
-            if (reason == GoogleMap.OnCameraMoveStartedListener.REASON_GESTURE) {
-                mViewModel.mIsFollowMe.setValue(false);
-            }
-        });
+        mViewModel.initMap(getActivity(), googleMap);
     }
 
     @Override
@@ -233,7 +187,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
             final double lat = data.getDoubleExtra(Position.LAT, Position.BAD_POS);
             final double lon = data.getDoubleExtra(Position.LON, Position.BAD_POS);
             if (lat > Position.BAD_POS && lon > Position.BAD_POS) {
-                mViewModel.getCameraPos().setValue(new LatLng(lat, lon));
+                mViewModel.setCameraPos(lat, lon);
             }
         }
     }
@@ -258,15 +212,8 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
      */
     private void updateFollowMeState(final boolean followMe) {
         if (followMe) {
-            final Location myPos = mLocationUtils.getLastKnownLocation();
-            if (myPos != null) {
-                mMapUtils.animateCameraTo(mMap, myPos.getLatitude(), myPos.getLongitude());
-            }
+            mViewModel.animateCameraToMyPos();
         }
-        /*if (getActivity() != null) {
-            mFollowMeBtn.setImageDrawable(ContextCompat.getDrawable(getActivity(),
-                    followMe ? R.drawable.ic_near_me_black_24dp : R.drawable.ic_my_location_off_black_48dp));
-        }*/
     }
 
     /**
@@ -301,9 +248,9 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
      * Sets menu closed mode.
      */
     private void setMenuClosedMode() {
-        if (mAlarmRadius != null) {
+        /*if (mAlarmRadius != null) {
             mAlarmRadius.setVisible(false);
-        }
+        }*/
         mAlarmTarget.setVisibility(View.GONE);
         mRadiusSeekBar.setVisibility(View.GONE);
         if (mOkBtn.getVisibility() == View.VISIBLE) {
@@ -320,9 +267,9 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
      * Sets menu opened mode.
      */
     private void setMenuOpenedMode() {
-        if (mAlarmRadius != null) {
+        /*if (mAlarmRadius != null) {
             mAlarmRadius.setVisible(false);
-        }
+        }*/
         mAlarmTarget.setVisibility(View.GONE);
         mRadiusSeekBar.setVisibility(View.GONE);
         if (mOkBtn.getVisibility() == View.VISIBLE) {
@@ -339,9 +286,9 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
      * Sets alarm position mode.
      */
     private void setAlarmPosMode() {
-        if (mAlarmRadius != null) {
+        /*if (mAlarmRadius != null) {
             mAlarmRadius.setVisible(false);
-        }
+        }*/
         mRadiusSeekBar.setVisibility(View.GONE);
         mAlarmTarget.setVisibility(View.VISIBLE);
         if (mOkBtn.getVisibility() != View.VISIBLE) {
@@ -358,7 +305,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
      * Sets alarm radius mode.
      */
     private void setAlarmRadiusMode() {
-        if (mMap != null) {
+        /*if (mMap != null) {
             mAlarmRadius = mMap.addCircle(new CircleOptions()
                     .center(mMap.getCameraPosition().target)
                     .visible(true)
@@ -368,7 +315,7 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
                     .radius(1000)
             );
             mMapUtils.animateCameraTo(mMap, mAlarmRadius);
-        }
+        }*/
 
         mRadiusSeekBar.setVisibility(View.VISIBLE);
         mAlarmTarget.setVisibility(View.GONE);
@@ -392,10 +339,10 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private void radiusChanged(final double radius) {
-        if (mAlarmRadius != null) {
+        /*if (mAlarmRadius != null) {
             mAlarmRadius.setRadius(radius);
             mMapUtils.animateCameraTo(mMap, mAlarmRadius);
-        }
+        }*/
     }
 
     private void bottomSheetStateChangred(final int newState) {
@@ -435,21 +382,9 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     }
 
     /**
-     * Initiates view model.
-     */
-    private void initViewModel() {
-        mViewModel = ViewModelProviders.of(this).get(MapFragmentViewModel.class);
-        // mViewModel.getFollowMeState().observe(this, this::updateFollowMeState);
-        mViewModel.getAlarms().observe(this, this::showAlarms);
-        mViewModel.getMode().observe(this, this::modeChanged);
-    }
-
-    /**
      * Initiates click observables.
      */
     private void initClickObservables() {
-        mZoomInClickObservable = createClickObservable(mZoomInBtn);
-        mZoomOutClickObservable = createClickObservable(mZoomOutBtn);
         mSearchCardClickObservable = createClickObservable(mSearchCard);
         mAddAlarmBtnClickObservable = createClickObservable(mAddAlarmBtn);
     }
@@ -460,8 +395,6 @@ public class MapFragment extends Fragment implements OnMapReadyCallback {
     private void subscribeClickObservables() {
         mCompositeDisposable = new CompositeDisposable();
         mCompositeDisposable.add(mAddAlarmBtnClickObservable.subscribe(v -> mViewModel.clickAddAlarm()));
-        mCompositeDisposable.add(mZoomInClickObservable.subscribe(v -> mMapUtils.zoomIn(mMap)));
-        mCompositeDisposable.add(mZoomOutClickObservable.subscribe(v -> mMapUtils.zoomOut(mMap)));
         mCompositeDisposable.add(mSearchCardClickObservable.subscribe(v -> startActivityForResult(
                 new Intent(getContext(), SearchActivity.class), REQUEST_CODE_SEARCH_PLACE)));
         mCompositeDisposable.add(mBottomSheetStateChangedObservable.subscribe(this::bottomSheetStateChangred));
